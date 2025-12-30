@@ -1,0 +1,181 @@
+oc -n openshift-adp exec -it deployment/velero -c velero -- ./velero
+oc -n openshift-adp exec -it deployment/velero -c velero -- ./velero create backup --from-schedule my-app-schedule
+oc -n openshift-adp exec -it deployment/velero -c velero -- ./velero create restore --from-backup my-app-backup
+
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: my-client-certificate
+spec:
+   signerName: kubernetes.io/kube-apiserver-client
+   expirationSeconds: 604800
+   request: 
+   usages:
+   - client auth
+   
+ ======================
+oc config set-credentials mon-punit --client-certificate=my-client.crt --client-key=monitoing.key --embed-certs --kubeconfig mon-project.config
+oc config set-cluster api-ocp4-example-com:6443 --server=https://api.ocp4.example.com:6443 --certificate-authority=my-api.crt --embed-certs=true --kubeconfig mon-project.config 
+
+
+
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: eventrouter-template
+  annotations:
+    description: "A pod forwarding kubernetes events to OpenShift Logging stack."
+    tags: "events,EFK,logging,cluster-logging"
+objects:
+  - kind: ServiceAccount
+    apiVersion: v1
+    metadata:
+      name: eventrouter
+      namespace: ${NAMESPACE}
+  - kind: ClusterRole
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: event-reader
+    rules:
+    - apiGroups: [""]
+      resources: ["events"]
+      verbs: ["get", "watch", "list"]
+  - kind: ClusterRoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: event-reader-binding
+    subjects:
+    - kind: ServiceAccount
+      name: eventrouter
+      namespace: ${NAMESPACE}
+    roleRef:
+      kind: ClusterRole
+      name: event-reader
+  - kind: ConfigMap
+    apiVersion: v1
+    metadata:
+      name: eventrouter
+      namespace: ${NAMESPACE}
+    data:
+      config.json: |-
+        {
+          "sink": "stdout"
+        }
+  - kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+      name: eventrouter
+      namespace: ${NAMESPACE}
+      labels:
+        component: "eventrouter"
+        logging-infra: "eventrouter"
+        provider: "openshift"
+    spec:
+      selector:
+        matchLabels:
+          component: "eventrouter"
+          logging-infra: "eventrouter"
+          provider: "openshift"
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            component: "eventrouter"
+            logging-infra: "eventrouter"
+            provider: "openshift"
+          name: eventrouter
+        spec:
+          serviceAccount: eventrouter
+          containers:
+            - name: kube-eventrouter
+              image: ${IMAGE}
+              imagePullPolicy: IfNotPresent
+              resources:
+                requests:
+                  cpu: ${CPU}
+                  memory: ${MEMORY}
+              volumeMounts:
+              - name: config-volume
+                mountPath: /etc/eventrouter
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+          - name: config-volume
+            configMap:
+              name: eventrouter
+parameters:
+  - name: IMAGE
+    displayName: Image
+    value: "registry.redhat.io/openshift-logging/eventrouter-rhel9:v0.4"
+  - name: CPU 
+    displayName: CPU
+    value: "100m"
+  - name: MEMORY
+    displayName: Memory
+    value: "128Mi"
+  - name: NAMESPACE
+    displayName: Namespace
+    value: "openshift-logging"  
+    
+    
+openssl req -newkey rsa:4096 -outkey key.key -nodes -subj "/O=monitoring/CN=jonah" -out csr.csr
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: my-cert
+spec:
+  signerName: kubernetes.io/kube-apiserver-client
+  expirationSeconds: 608400 
+  request: 
+  usages:
+  - client auth
+openssl s_client -showcerts -connect=api.ocp4.example.com:6443 < /dev/null 2> /dev/null | openssl x509 -outform PEM > ca-cert.crt
+openssl s_client -showcerts -connect=api.ocp4.example.com:6443 < /dev/null 2> /dev/null | openssl x509 -outform PEM > ca.cert.crt
+
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata: 
+  name: client-cert
+spec:
+  signerName: kubernetes.io/kube-apiserver-client
+  expirationSeconds: 608400
+  request:
+  usages: client auth
+  
+
+Question 1
+==========
+Ensure that you can deploy applications on the nodes
+- Also an image is given, test your nodes by deploying the given image on all three worker nodes
+
+Question 2
+==========
+Configure and set up ldap
+
+cn=users,cn-accounts,dc=domain13,dc=example,dc=com
+server: auth.domain13.example.com
+
+Question 3
+==========
+
+
+
+oc adm taint node/worker0 key=value:NoSchedule-
+
+velero restore create 
+
+
+
+find / -name collector.sh
+https://www.linkedin.com/in/jonah-irande-urenyang-321b05155
+
+
+
+
+
