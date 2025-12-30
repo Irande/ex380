@@ -14,8 +14,11 @@ spec:
    - client auth
    
  ======================
+
 oc config set-credentials mon-punit --client-certificate=my-client.crt --client-key=monitoing.key --embed-certs --kubeconfig mon-project.config
 oc config set-cluster api-ocp4-example-com:6443 --server=https://api.ocp4.example.com:6443 --certificate-authority=my-api.crt --embed-certs=true --kubeconfig mon-project.config 
+oc config set-context mon-punit --cluster api-oco4-example-com:6443 --namespace default --user mon-punit --group cluster-admin --kubeconfig mon-project.config
+oc config use-context mon-punit --kubeconfig mon-project.config
 
 
 
